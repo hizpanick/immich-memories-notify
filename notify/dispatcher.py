@@ -1,4 +1,4 @@
-"""Notification dispatcher: routes to ntfy or apprise backend based on user config."""
+"""Notification dispatcher: routes to ntfy, apprise or homeassistant backend based on user config."""
 
 import logging
 
@@ -15,6 +15,10 @@ def send_notification(
 
     if service == "apprise":
         from .apprise_backend import send_single_notification
+        return send_single_notification(user, notification, config, logger, thumbnail_override)
+
+    if service == "homeassistant":
+        from .homeassistant import send_single_notification
         return send_single_notification(user, notification, config, logger, thumbnail_override)
 
     from .ntfy import send_single_notification

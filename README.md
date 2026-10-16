@@ -10,6 +10,7 @@ Daily "On This Day" push notifications from your [Immich](https://immich.app/) s
 - [Screenshots](#screenshots)
 - [Common Commands](#common-commands)
 - [Configuration](#configuration)
+- [Home Assistant](#home-assistant)
 - [Self-Hosting ntfy](#self-hosting-ntfy)
 - [Dashboard](#dashboard)
 - [Immich API Key Permissions](#immich-api-key-permissions)
@@ -230,6 +231,27 @@ trip_highlights_messages:    # {city} {country} {year} {gap}
 Memory, person, and album messages also have `video_*` variants (used when a video is picked), and every type has a `*_titles` list for notification titles (e.g. `memory_titles`, `person_titles`, `album_titles`) with the same core placeholders.
 
 </details>
+
+## Home Assistant
+
+Send notifications through the Home Assistant Companion app instead of ntfy/Apprise, so users don't need another app. Set it per user:
+
+```
+homeassistant:
+  url: ${HA_URL}                    # e.g. http://192.168.1.10:8123 (reachable from this container)
+  token: ${HA_TOKEN}                # long-lived access token (HA profile page)
+  www_path: /ha-www                 # this container's mount of HA's config/www folder
+  image_subdir: memnotify           # optional, subfolder under www (default: memnotify)
+  image_ttl_hours: 24               # optional, how long thumbnails are kept (default: 24)
+
+users:
+  - name: Bob
+    immich_api_key: ${IMMICH_API_KEY_BOB}
+    notification_service: homeassistant
+    ha_notify_service: notify.mobile_app_bobs_phone
+```
+
+Thumbnails are written to `<www_path>/<image_subdir>/` and shown via `/local/...`. Files under `/local/` are served without authentication, so each image gets a random file name and is deleted after `image_ttl_hours`. Tapping a notification opens the Immich link (`clickAction` on Android, `url` on iOS). Without `www_path`, notifications are sent without an image. Home Assistant users are currently configured in `config.yaml`/`.env` (the dashboard doesn't have a Home Assistant option yet).
 
 ## Self-Hosting ntfy
 

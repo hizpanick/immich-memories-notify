@@ -40,6 +40,8 @@ services:
       # want your own custom templates (the host folder must contain them —
       # an empty folder hides the built-in ones):
       # - ./custom_templates:/app/custom_templates:ro
+      # Home Assistant backend: mount HA's config/www folder (thumbnails are served from /local/)
+      # - /path/to/homeassistant/config/www:/ha-www
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
