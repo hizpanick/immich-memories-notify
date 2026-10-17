@@ -455,6 +455,19 @@ def _resolve_user_api_key(user: dict) -> str:
     return ref
 
 
+def _get_immich_url() -> str:
+    """IMMICH_URL from the process environment, falling back to the .env file
+    (the container may not have been started with env_file)."""
+    from .secrets import load_env_file, ENV_PATH
+    url = os.environ.get("IMMICH_URL", "")
+    if not url:
+        try:
+            url = load_env_file(ENV_PATH).get("IMMICH_URL", "")
+        except Exception:
+            url = ""
+    return url.strip().rstrip("/")
+
+
 @router.get("/users/{name}/cities")
 async def get_user_cities(request: Request, name: str):
     """Fetch unique cities from a user's photos in Immich."""
@@ -473,7 +486,7 @@ async def get_user_cities(request: Request, name: str):
     if not api_key:
         raise HTTPException(status_code=400, detail="User has no API key configured")
 
-    immich_url = os.environ.get("IMMICH_URL", "").rstrip("/")
+    immich_url = _get_immich_url()
     if not immich_url:
         raise HTTPException(status_code=400, detail="IMMICH_URL not configured")
 
@@ -515,7 +528,7 @@ async def get_user_albums(request: Request, name: str):
     if not api_key:
         raise HTTPException(status_code=400, detail="User has no API key configured")
 
-    immich_url = os.environ.get("IMMICH_URL", "").rstrip("/")
+    immich_url = _get_immich_url()
     if not immich_url:
         raise HTTPException(status_code=400, detail="IMMICH_URL not configured")
 
