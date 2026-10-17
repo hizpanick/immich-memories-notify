@@ -12,18 +12,54 @@ without authentication, so the random name is what keeps the URL private.
 """
 
 import logging
-import os
 import re
 import time
 import uuid
+from io import BytesIO
 from pathlib import Path
 
 import requests
+from PIL import Image, ImageFilter, ImageOps
 
 from .immich import fetch_thumbnail
 from .utils import with_retry
 
 _FILE_RE = re.compile(r"^[0-9a-f]{32}\.jpg$")
+
+DEFAULT_IMAGE_ASPECT = 2.0   # width / height of the notification image area
+MAX_IMAGE_WIDTH = 1600
+
+
+def _fit_image(data: bytes, aspect: float, logger: logging.Logger) -> bytes:
+    """Pad narrow (portrait / near-square) photos onto a wide blurred canvas.
+
+    Android crops tall images in the expanded notification. Photos already at
+    least as wide as ``aspect`` are returned unchanged; anything else is placed,
+    uncropped, on a blurred copy of itself so nothing is cut off.
+    """
+    try:
+        img = ImageOps.exif_transpose(Image.open(BytesIO(data))).convert("RGB")
+    except Exception as e:
+        logger.debug(f"Could not decode image for fitting: {e}")
+        return data
+
+    w, h = img.size
+    if h == 0 or w / h >= aspect:
+        return data
+
+    canvas_w = round(h * aspect)
+    background = ImageOps.fit(img, (canvas_w, h), method=Image.LANCZOS)
+    background = background.filter(ImageFilter.GaussianBlur(radius=max(h // 40, 8)))
+    background = Image.blend(background, Image.new("RGB", background.size, (0, 0, 0)), 0.35)
+    background.paste(img, ((canvas_w - w) // 2, 0))
+
+    if background.width > MAX_IMAGE_WIDTH:
+        scale = MAX_IMAGE_WIDTH / background.width
+        background = background.resize((MAX_IMAGE_WIDTH, round(background.height * scale)), Image.LANCZOS)
+
+    out = BytesIO()
+    background.save(out, format="JPEG", quality=85)
+    return out.getvalue()
 
 
 def _service_path(target: str) -> str:
@@ -113,7 +149,7 @@ def send_single_notification(
     elif asset_id:
         try:
             thumbnail_data = with_retry(
-                lambda: fetch_thumbnail(immich_url, api_key, asset_id),
+                lambda: fetch_thumbnail(immich_url, api_key, asset_id, size="preview"),
                 max_attempts=retry_config["max_attempts"],
                 delay=retry_config["delay_seconds"],
                 logger=logger,
@@ -127,6 +163,10 @@ def send_single_notification(
         thumbnail_data = thumbnail_override
 
     click_url = notification.get("click_url")
+    if click_url and not click_url.startswith(("http://", "https://")):
+        # The Companion app can't launch custom schemes such as immich://memory?...
+        # (it falls back to opening Home Assistant), so use a web link the Immich app handles.
+        click_url = None
     if not click_url and click_base:
         click_url = f"{click_base}/photos/{asset_id}" if asset_id else f"{click_base}/"
 
@@ -137,6 +177,12 @@ def send_single_notification(
         data["clickAction"] = click_url  # Android
         data["url"] = click_url          # iOS
     if thumbnail_data:
+        if str(ha_cfg.get("image_fit", "pad")).lower() != "original":
+            try:
+                aspect = float(ha_cfg.get("image_aspect", DEFAULT_IMAGE_ASPECT))
+            except (TypeError, ValueError):
+                aspect = DEFAULT_IMAGE_ASPECT
+            thumbnail_data = _fit_image(thumbnail_data, aspect, logger)
         image_path = _store_image(ha_cfg, thumbnail_data, logger)
         if image_path:
             data["image"] = image_path

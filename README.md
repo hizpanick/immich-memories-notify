@@ -243,6 +243,8 @@ homeassistant:
   www_path: /ha-www                 # this container's mount of HA's config/www folder
   image_subdir: memnotify           # optional, subfolder under www (default: memnotify)
   image_ttl_hours: 24               # optional, how long thumbnails are kept (default: 24)
+  image_fit: pad                    # optional: pad (default) puts tall photos on a blurred wide canvas so Android doesn't crop them; original = send as is
+  image_aspect: 2.0                 # optional, width/height of that canvas (default: 2.0)
 
 users:
   - name: Bob
@@ -251,7 +253,7 @@ users:
     ha_notify_service: notify.mobile_app_bobs_phone
 ```
 
-Thumbnails are written to `<www_path>/<image_subdir>/` and shown via `/local/...`. Files under `/local/` are served without authentication, so each image gets a random file name and is deleted after `image_ttl_hours`. Tapping a notification opens the Immich link (`clickAction` on Android, `url` on iOS). Without `www_path`, notifications are sent without an image. Home Assistant users are currently configured in `config.yaml`/`.env` (the dashboard doesn't have a Home Assistant option yet).
+Thumbnails are written to `<www_path>/<image_subdir>/` and shown via `/local/...`. Files under `/local/` are served without authentication, so each image gets a random file name and is deleted after `image_ttl_hours`. Tapping a notification opens the Immich link (`clickAction` on Android, `url` on iOS). The Companion app can't launch custom schemes, so memories use a web link (`IMMICH_EXTERNAL_URL/photos/<id>`, e.g. `https://my.immich.app`) instead of `immich://memory`; set `IMMICH_EXTERNAL_URL` or notifications have no tap link. Without `www_path`, notifications are sent without an image. Home Assistant users are currently configured in `config.yaml`/`.env` (the dashboard doesn't have a Home Assistant option yet).
 
 ## Self-Hosting ntfy
 
