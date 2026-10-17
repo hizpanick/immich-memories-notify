@@ -216,11 +216,13 @@ def prepare_trip_notification(
     # Detection: check originalFileName prefix (v3) or legacy deviceId/deviceAssetId (v2).
     album_name = f"Trip to {city}, {country} ({year})"
     uploaded_asset_id = None
+    trip_album_id = None
     collage = None
     valid_ids = []
     try:
         existing_album = get_album_assets(immich_url, api_key, album_name, _logger)
         if existing_album:
+            trip_album_id = existing_album.get("album_id")
             for a in existing_album.get("assets", []):
                 if (str(a.get("originalFileName", "")).startswith("memnotify-collage")
                         or a.get("deviceId") == "memnotify"
@@ -288,6 +290,7 @@ def prepare_trip_notification(
         try:
             album_id = get_or_create_album(immich_url, api_key, album_name, _logger)
             if album_id:
+                trip_album_id = album_id
                 headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
                 add_url = f"{immich_url}/api/albums/{album_id}/assets"
                 add_body = {"ids": asset_ids}
@@ -321,12 +324,21 @@ def prepare_trip_notification(
 
     click_asset = random.choice(valid_ids or asset_ids)
 
+    # Prefer the trip's album (the Immich app opens https://<host>/albums/<id> as the
+    # album screen); fall back to a random original photo if the album isn't known.
+    if click_base and trip_album_id:
+        click_url = f"{click_base}/albums/{trip_album_id}"
+    elif click_base:
+        click_url = f"{click_base}/photos/{click_asset}"
+    else:
+        click_url = None
+
     return {
         "title": title,
         "message": message,
         "has_content": True,
         "asset_id": uploaded_asset_id,
-        "click_url": f"{click_base}/photos/{click_asset}" if click_base else None,
+        "click_url": click_url,
         "is_trip": True,
         "is_video": False,
         "collage_data": collage,
