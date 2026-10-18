@@ -651,7 +651,10 @@ def upload_collage_to_album(
     """Upload collage image to Immich and add to album."""
     try:
         headers = {"x-api-key": api_key}
-        now_iso = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        # The collage has no EXIF timezone, so Immich files it on the timeline by the
+        # UTC calendar date. Stamp it with the local wall-clock time (labelled "Z") so
+        # an evening upload doesn't land on tomorrow's date.
+        now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
         collage_filename = f"memnotify-collage-{int(time.time())}.jpg"
         files = {"assetData": (collage_filename, collage_data, "image/jpeg")}
