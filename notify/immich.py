@@ -181,13 +181,30 @@ def fetch_people(immich_url: str, api_key: str, timeout: int = 10) -> list:
     return data if isinstance(data, list) else []
 
 
-def fetch_person_assets(immich_url: str, api_key: str, person_id: str, timeout: int = 30, size: int = 1000) -> list:
-    """Fetch assets for a specific person using search API."""
+def fetch_person_assets(
+    immich_url: str,
+    api_key: str,
+    person_id: str,
+    timeout: int = 30,
+    size: int = 1000,
+    taken_after: str = None,
+    taken_before: str = None,
+) -> list:
+    """Fetch assets for a specific person using search API.
+
+    Without a date window Immich returns only one page of the newest assets,
+    so callers that need a specific month of an older year should pass
+    taken_after / taken_before (ISO 8601 timestamps).
+    """
     headers = {"Accept": "application/json", "x-api-key": api_key}
     payload = {
         "personIds": [person_id],
         "size": size,
     }
+    if taken_after:
+        payload["takenAfter"] = taken_after
+    if taken_before:
+        payload["takenBefore"] = taken_before
     response = requests.post(
         f"{immich_url}/api/search/metadata",
         headers=headers,

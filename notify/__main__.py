@@ -283,6 +283,11 @@ def process_user_window(
                         top_person_ids=top_person_ids, test_mode=test_mode,
                         logger=logger, click_base=click_base,
                     )
+                    if not notification:
+                        logger.warning(
+                            f"  [{name}] {selected_special} produced no content, "
+                            f"falling back to a regular event"
+                        )
 
             # Layer 3: Regular events (memory/person/album)
             if not notification:

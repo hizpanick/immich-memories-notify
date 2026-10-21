@@ -1,5 +1,6 @@
 """Then & Now feature: find candidates, compose images, prepare notifications."""
 
+import calendar
 import logging
 import random
 from collections import defaultdict
@@ -52,11 +53,24 @@ def find_then_and_now_candidate(
         if not person_id or not pname:
             continue
 
-        try:
-            assets = fetch_person_assets(immich_url, api_key, person_id)
-        except Exception as e:
-            if logger:
-                logger.debug(f"  Then & Now: could not fetch assets for {pname}: {e}")
+        # Query each past year's target month separately. A single unfiltered
+        # request only returns the newest ~1000 assets, which for a top person
+        # rarely spans enough years to satisfy min_gap.
+        assets = []
+        fetch_failed = False
+        for year in range(min_year, target_year):
+            last_day = calendar.monthrange(year, target_month)[1]
+            try:
+                assets.extend(fetch_person_assets(
+                    immich_url, api_key, person_id,
+                    taken_after=f"{year}-{target_month:02d}-01T00:00:00.000Z",
+                    taken_before=f"{year}-{target_month:02d}-{last_day:02d}T23:59:59.999Z",
+                ))
+            except Exception as e:
+                fetch_failed = True
+                if logger:
+                    logger.debug(f"  Then & Now: could not fetch {year} assets for {pname}: {e}")
+        if fetch_failed and not assets:
             continue
 
         # Group IMAGE assets by year
@@ -143,7 +157,10 @@ def find_then_and_now_candidate(
 
     if not candidates:
         if logger:
-            logger.debug(f"  No Then & Now candidate found (need same person in same month across {min_gap}+ years)")
+            logger.info(
+                f"  No Then & Now candidate found (need same person in month {target_month} "
+                f"across {min_gap}+ years, within {year_range} years)"
+            )
         return None
 
     # Sort: prefer unused persons first, then largest gap
